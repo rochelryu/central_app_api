@@ -42,14 +42,18 @@ async function bootstrap() {
     .setTitle('Welcome To Documentation')
     .setDescription('The mini API description')
     .setVersion('1.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'access-token', // This is the name of the security scheme
+    )
     //.addTag('cats')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docWelcome', app, document);
+  SwaggerModule.setup('centralDoc', app, document);
 
   await app.listen(process.env.APP_PORT.toString(), () => {
     logger.verbose(
-      `HTTP SERVICE READY... ${process.env.APP_HOST}:${process.env.APP_PORT}`,
+      `HTTP SERVICE READY... ${process.env.APP_HOST}:${process.env.APP_PORT}/centralDoc`,
     );
   });
 }

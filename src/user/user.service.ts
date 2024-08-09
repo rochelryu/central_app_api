@@ -53,7 +53,7 @@ export class UserService {
                   recovery,
                   gravatar,
                   role,
-                  companie,
+                  compagnie,
                 } = result;
 
                 next({
@@ -66,7 +66,7 @@ export class UserService {
                     recovery,
                     gravatar,
                     role,
-                    companie,
+                    compagnie,
                   },
                 });
               })
@@ -104,7 +104,7 @@ export class UserService {
                 recovery,
                 gravatar,
                 role,
-                companie,
+                compagnie,
               } = result;
 
               next({
@@ -118,7 +118,7 @@ export class UserService {
                   recovery,
                   gravatar,
                   role,
-                  companie,
+                  compagnie,
                 },
               });
             } else {

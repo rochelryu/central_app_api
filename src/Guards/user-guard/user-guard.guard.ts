@@ -41,6 +41,7 @@ export class UserGuard implements CanActivate {
       if (!user) {
         throw new HttpException('Not User Found', HttpStatus.NOT_FOUND);
       }
+      request['userEntity'] = user;
       return true;
     } catch (error) {
       this.logger.error(error.message);

@@ -14,7 +14,10 @@ import { TransformResultInJwtInterceptor } from 'src/Interceptors/ToResponse/Tra
 import { prefixApi } from 'src/Constants/api';
 import { AuthenticationUserDto } from './dto/authentication-user.dto';
 import { UserGuard } from 'src/Guards/user-guard/user-guard.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('user')
+@ApiBearerAuth('access-token')
 @Controller(prefixApi('user'))
 export class UserController {
   constructor(private readonly userService: UserService) {}

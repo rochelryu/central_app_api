@@ -12,7 +12,7 @@ export class User {
   fullName: string;
 
   @Prop({ default: '' })
-  companie: string;
+  compagnie: string;
 
   @Prop({ default: '' })
   number: string;
@@ -32,7 +32,7 @@ export class User {
   @Prop({ default: RoleEnum.GESTION_ADMIN, enum: RoleEnum })
   role: RoleEnum;
 
-  @Prop({ default: 'user1.png' })
+  @Prop({ default: 'avatar_1.jpg' })
   gravatar: string;
 }
 
