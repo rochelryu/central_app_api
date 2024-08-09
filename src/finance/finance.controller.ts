@@ -18,7 +18,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { prefixApi } from 'src/Constants/api';
 import { UserGuard } from 'src/Guards/user-guard/user-guard.guard';
 import { FinanceGuardGuard } from 'src/Guards/finance-guard/finance-guard.guard';
-import { AmountTransformerPipe } from 'src/pipes/amount-transformer/amount-transformer.pipe';
+import { AmountTransformerPipe } from 'src/Pipes/amount-transformer/amount-transformer.pipe';
 import {
   ResultStateEnum,
   TypePayementMarchandForAggregateur,
@@ -59,7 +59,7 @@ export class FinanceController {
 
   @Post('deposit')
   @UseGuards(FinanceGuardGuard)
-  @UsePipes(new AmountTransformerPipe())
+  @UsePipes(AmountTransformerPipe)
   async deposit(
     @Body()
     cashout: CreateCashoutDto,

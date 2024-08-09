@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  central_api_app_docker_service:
+    restart: always
+    ports:
+      - 8080:8080
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - .env
+    networks:
+      - central_api_network
+
+networks:
+  central_api_network:

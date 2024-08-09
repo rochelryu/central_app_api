@@ -19,7 +19,7 @@ export class CreateFinanceDto {
     description: "URL de callback qui doit contenir 'http'",
     type: String,
     title: 'urlCallback',
-    default: 'http://example.com/callback',
+    default: 'https://example.com/callback',
   })
   @IsUrl(
     {},
