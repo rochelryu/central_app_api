@@ -17,7 +17,7 @@ export class FinanceAccount {
   @Prop({ default: 0, type: Number })
   balance: number;
 
-  @Prop({ default: 0.035, type: Number })
+  @Prop({ default: 0.03, type: Number })
   percentage: number;
 
   @Prop({ default: '' })
