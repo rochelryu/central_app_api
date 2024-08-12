@@ -12,7 +12,7 @@ export class FinanceAccount {
     type: SchemaNatif.Types.ObjectId,
     ref: User.name,
   })
-  idUser: string;
+  idUser: User;
 
   @Prop({ default: 0, type: Number })
   balance: number;

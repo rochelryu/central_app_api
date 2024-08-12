@@ -16,10 +16,10 @@ export class SmsUser {
   secret_token: string;
 
   @Prop({ type: SchemaNatif.Types.ObjectId, ref: User.name, required: true })
-  user_id: SchemaNatif.Types.ObjectId;
+  userId: User;
 
   @Prop({ type: Number })
-  sms_solde: number;
+  smsSolde: number;
 
   @Prop({ type: [{ type: String }], default: [] })
   sms_sender_name: string;

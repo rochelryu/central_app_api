@@ -9,7 +9,7 @@ export class SmsMessage {
   _id: SchemaNatif.Types.ObjectId;
 
   @Prop({ type: SchemaNatif.Types.ObjectId, ref: User.name, required: true })
-  user_id: SchemaNatif.Types.ObjectId;
+  userId: User;
 
   @Prop()
   content: string;

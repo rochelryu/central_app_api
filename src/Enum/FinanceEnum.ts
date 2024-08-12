@@ -7,7 +7,7 @@ export enum TypePayementMobileMoney {
 
 export enum ResultStateEnum {
   INITIALISE = 'INITIALISE',
-  IN_WAIT = 'IN_WAIT',
+  PENDING = 'PENDING',
   DONE = 'DONE',
   FAILURE = 'FAILURE',
   SUSPECT = 'SUSPECT',
@@ -20,13 +20,13 @@ export enum TypeTransaction {
   WITHDRAW = 'WITHDRAW',
 }
 
-export enum TypePayementMarchandForAggregateur {
+export enum TypePayementMarchandCashOutForAggregateur {
   ORANGE = 'PAIEMENTMARCHANDOMPAYCIDIRECT',
   MTN = 'PAIEMENTMARCHAND_MTN_CI',
   Moov = 'PAIEMENTMARCHAND_MOOV_CI',
 }
 
-export enum TypePayementMarchandOutForAggregateur {
+export enum TypePayementMarchandCashInForAggregateur {
   ORANGE = 'CASHINOMCIPART',
   MTN = 'CASHINMTNPART',
   Moov = 'CASHINMOOVPART',

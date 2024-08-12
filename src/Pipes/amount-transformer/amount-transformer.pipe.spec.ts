@@ -1,7 +1,7 @@
-import { AmountTransformerPipe } from './amount-transformer.pipe';
+import { AmountDepositTransformerPipe } from './amount-transformer.pipe';
 
-describe('AmountTransformerPipe', () => {
+describe('AmountDepositTransformerPipe', () => {
   it('should be defined', () => {
-    expect(new AmountTransformerPipe()).toBeDefined();
+    expect(new AmountDepositTransformerPipe()).toBeDefined();
   });
 });

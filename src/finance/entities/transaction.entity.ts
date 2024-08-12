@@ -6,6 +6,7 @@ import {
   TypeTransaction,
 } from 'src/Enum/FinanceEnum';
 import { FinanceAccount } from './finance.entity';
+import 'dotenv/config';
 
 export type TransactionDocument = HydratedDocument<Transaction>;
 
@@ -17,7 +18,7 @@ export class Transaction {
     type: SchemaNatif.Types.ObjectId,
     ref: FinanceAccount.name,
   })
-  financeAccountId: string;
+  financeAccountId: FinanceAccount;
 
   @Prop({ default: '' })
   numero: string;

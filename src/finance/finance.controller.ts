@@ -2,42 +2,54 @@ import {
   Controller,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   UseGuards,
   Request,
   UsePipes,
   Logger,
+  Get,
 } from '@nestjs/common';
 import { FinanceService } from './finance.service';
 import { CreateFinanceDto } from './dto/create-finance.dto';
 import { CreateCashoutDto } from './dto/create-cashout.dto';
-import { UpdateFinanceDto } from './dto/update-finance.dto';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { prefixApi } from 'src/Constants/api';
 import { UserGuard } from 'src/Guards/user-guard/user-guard.guard';
 import { FinanceGuardGuard } from 'src/Guards/finance-guard/finance-guard.guard';
-import { AmountTransformerPipe } from 'src/Pipes/amount-transformer/amount-transformer.pipe';
+import {
+  AmountDepositTransformerPipe,
+  AmountWithdrawTransformerPipe,
+} from 'src/Pipes/amount-transformer/amount-transformer.pipe';
 import {
   ResultStateEnum,
-  TypePayementMarchandForAggregateur,
+  TypePayementMarchandCashInForAggregateur,
+  TypePayementMarchandCashOutForAggregateur,
   TypeTransaction,
 } from 'src/Enum/FinanceEnum';
-import { DataInterfaceCashInForTouchPay } from 'src/Interfaces/TransactionInterface';
+import {
+  DataInfoInterfaceFinanceAccount,
+  DataInfoInterfaceTransaction,
+  DataInterfaceCashInForTouchPay,
+  DataInterfaceCashOutForTouchPay,
+} from 'src/Interfaces/TransactionInterface';
 import {
   amountAddToReserve,
-  amountGiveAtClient,
+  amountGiveAtClientForDeposit,
+  amountGiveAtClientForWithdraw,
   attributServiceTouchCodeByMethodPaiement,
   cashInPaiementMarchand,
+  cashOutPaiementMarchand,
 } from 'src/Utils/function/transactionAction';
 import { AdminService } from 'src/admin/admin.service';
 import { HistoricalInterface } from 'src/Interfaces/ReserveInterface';
+import { CreateCashinDto } from './dto/create-cashin.dto';
+
+import 'dotenv/config';
 
 @ApiTags('finance')
 @ApiBearerAuth('access-token')
 @Controller(prefixApi('finance'))
-@UseGuards(UserGuard)
 export class FinanceController {
   private logger: Logger;
   constructor(
@@ -48,6 +60,7 @@ export class FinanceController {
   }
 
   @Post()
+  @UseGuards(UserGuard)
   create(@Body() createFinanceDto: CreateFinanceDto, @Request() req) {
     const { _id } = req.userEntity;
     return this.financeService.create({
@@ -59,14 +72,13 @@ export class FinanceController {
 
   @Post('deposit')
   @UseGuards(FinanceGuardGuard)
-  @UsePipes(AmountTransformerPipe)
+  @UsePipes(AmountDepositTransformerPipe)
   async deposit(
     @Body()
     cashout: CreateCashoutDto,
     @Request() req,
   ) {
     const { numberClient, typeService, amount, reference, otp } = cashout;
-    // console.log(cashout, req.userEntity, req.financeAccount);
     const dataOtp = otp ? { otp } : {};
     const newTransaction = await this.financeService.createTransaction({
       reference,
@@ -74,7 +86,7 @@ export class FinanceController {
       typeTransaction: TypeTransaction.DEPOSIT,
       service: typeService,
       montant_send_net: amount,
-      montant_give_of_client: amountGiveAtClient({
+      montant_give_of_client: amountGiveAtClientForDeposit({
         percentage: req.financeAccount.percentage as number,
         amount,
       }),
@@ -83,11 +95,11 @@ export class FinanceController {
     });
 
     if (newTransaction.etat) {
-      const infoCashInOperation: DataInterfaceCashInForTouchPay = {
+      const infoCashOutOperation: DataInterfaceCashOutForTouchPay = {
         serviceCode: attributServiceTouchCodeByMethodPaiement({
           typePaiement: typeService,
-          cashIn: true,
-        }) as TypePayementMarchandForAggregateur,
+          cashIn: false,
+        }) as TypePayementMarchandCashOutForAggregateur,
         idFromClient: newTransaction.result._id.toString(),
         amount,
         additionnalInfos: {
@@ -97,12 +109,12 @@ export class FinanceController {
           destinataire: numberClient,
           ...dataOtp,
         },
-        callback: process.env.INTOUCH_CALLBACK,
+        callback: process.env.INTOUCH_CALLBACK_OUT,
         recipientNumber: numberClient,
       };
 
       const depositRequestFromPartner =
-        await cashInPaiementMarchand(infoCashInOperation);
+        await cashOutPaiementMarchand(infoCashOutOperation);
 
       if (depositRequestFromPartner.etat) {
         if (
@@ -135,7 +147,7 @@ export class FinanceController {
           // Only paiement successfull for Orange Money
 
           const montant = depositRequestFromPartner.result.json.amount;
-          const montant_give_of_client = amountGiveAtClient({
+          const montant_give_of_client = amountGiveAtClientForDeposit({
             percentage: req.financeAccount.percentage as number,
             amount: montant,
           });
@@ -162,10 +174,12 @@ export class FinanceController {
             },
             depositRequestFromPartner.result.json.idFromGU,
           );
-          const buyClient = await this.financeService.depositInFinanceAccount({
-            amount: montant_give_of_client,
-            _id: req.financeAccount._id,
-          });
+          const buyClient =
+            await this.financeService.manageBalanceOfFinanceAccount({
+              amount: montant_give_of_client,
+              _id: req.financeAccount._id,
+              cashOut: true,
+            });
           const result = {
             etat: true,
             data: {
@@ -183,7 +197,7 @@ export class FinanceController {
 
           if (buyClient.etat) {
             // Send Mail
-            
+
             // await retrunInfoPaiementMarchand({
             //   urlCallback: req.financeAccount.urlCallback,
             //   data: result,
@@ -196,7 +210,7 @@ export class FinanceController {
           depositRequestFromPartner.result.json.status === 'PENDING'
         ) {
           await this.financeService.changeStateOnTransaction({
-            state: ResultStateEnum.IN_WAIT,
+            state: ResultStateEnum.PENDING,
             id: newTransaction.result._id.toHexString(),
           });
           const result = {
@@ -205,12 +219,12 @@ export class FinanceController {
               service: typeService,
               recipient_phone_number: newTransaction.result.numero,
               amount_send_net: amount,
-              amount_receive_in_balance: amountGiveAtClient({
+              amount_receive_in_balance: amountGiveAtClientForDeposit({
                 percentage: req.financeAccount.percentage as number,
                 amount,
               }),
               typeTransaction: TypeTransaction.DEPOSIT,
-              state: ResultStateEnum.IN_WAIT,
+              state: ResultStateEnum.PENDING,
               partner_reference: newTransaction.result.reference,
               transaction_reference: '',
             },
@@ -252,13 +266,214 @@ export class FinanceController {
     return newTransaction;
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateFinanceDto: UpdateFinanceDto) {
-    return this.financeService.update(+id, updateFinanceDto);
-  }
+  @Post('withdraw')
+  @UseGuards(FinanceGuardGuard)
+  @UsePipes(AmountWithdrawTransformerPipe)
+  async withdraw(
+    @Body()
+    cashin: CreateCashinDto,
+    @Request() req,
+  ) {
+    const { numberClient, typeService, amount, reference } = cashin;
+    if (req.financeAccount.balance >= amount) {
+      const newTransaction = await this.financeService.createTransaction({
+        reference,
+        numero: numberClient,
+        typeTransaction: TypeTransaction.WITHDRAW,
+        service: typeService,
+        montant_send_net: amount,
+        montant_give_of_client: amountGiveAtClientForWithdraw({
+          amount,
+        }),
+        financeAccountId: req.financeAccount._id,
+        state: ResultStateEnum.INITIALISE,
+      });
 
+      if (newTransaction.etat) {
+        const infoCashInOperation: DataInterfaceCashInForTouchPay = {
+          service_id: attributServiceTouchCodeByMethodPaiement({
+            typePaiement: typeService,
+            cashIn: true,
+          }) as TypePayementMarchandCashInForAggregateur,
+          recipient_phone_number: numberClient,
+          amount,
+          call_back_url: process.env.INTOUCH_CALLBACK_IN,
+          partner_id: process.env.INTOUCH_PARTNER_ID,
+          partner_transaction_id: newTransaction.result._id.toHexString(),
+          login_api: process.env.INTOUCH_LOGIN_API,
+          password_api: process.env.INTOUCH_PASSWORD_API,
+        };
+
+        const withdrawRequestFromPartner =
+          await cashInPaiementMarchand(infoCashInOperation);
+
+        if (withdrawRequestFromPartner.etat) {
+          const montant = amount;
+          const montant_give_of_client = amountGiveAtClientForWithdraw({
+            amount,
+          });
+          const montant_give_of_reserve = parseInt(
+            process.env.INTOUCH_FEES_CASHIN.toString(),
+            10,
+          );
+          if (withdrawRequestFromPartner.result.status === 'SUCCESSFUL') {
+            const historical: HistoricalInterface = {
+              type: TypeTransaction.WITHDRAW,
+              created_at: new Date(),
+              amount: montant_give_of_reserve,
+              reference: newTransaction.result._id.toHexString(),
+            };
+            await this.adminService.createReserveOrUpdate({
+              amount: montant_give_of_reserve,
+              historical,
+            });
+
+            await this.financeService.validateTransaction(
+              {
+                montant_send_net: montant,
+                montant_give_of_client,
+                id: newTransaction.result._id.toHexString(),
+              },
+              withdrawRequestFromPartner.result.gu_transaction_id,
+            );
+            const debitClient =
+              await this.financeService.manageBalanceOfFinanceAccount({
+                amount: montant_give_of_client,
+                _id: req.financeAccount._id,
+                cashOut: false,
+              });
+            const result = {
+              etat: true,
+              data: {
+                service: typeService,
+                recipient_phone_number: newTransaction.result.numero,
+                amount_send_net: montant,
+                amount_receive_in_balance: montant_give_of_client,
+                typeTransaction: TypeTransaction.WITHDRAW,
+                state: ResultStateEnum.DONE,
+                partner_reference: newTransaction.result.reference,
+                transaction_reference:
+                  withdrawRequestFromPartner.result.gu_transaction_id,
+              },
+            };
+
+            if (debitClient.etat) {
+              // Send Mail
+
+              // await retrunInfoPaiementMarchand({
+              //   urlCallback: req.financeAccount.urlCallback,
+              //   data: result,
+              // });
+              return result;
+            }
+            return result;
+          } else if (
+            withdrawRequestFromPartner.result.status === 'INITIATED' ||
+            withdrawRequestFromPartner.result.status === 'PENDING'
+          ) {
+            await this.financeService.changeStateOnTransaction({
+              state: ResultStateEnum.PENDING,
+              id: newTransaction.result._id.toHexString(),
+            });
+            const result = {
+              etat: true,
+              data: {
+                service: typeService,
+                recipient_phone_number: newTransaction.result.numero,
+                amount_send_net: amount,
+                amount_receive_in_balance: montant_give_of_client,
+                typeTransaction: TypeTransaction.WITHDRAW,
+                state: ResultStateEnum.PENDING,
+                partner_reference: newTransaction.result.reference,
+                transaction_reference: '',
+              },
+            };
+            return result;
+          } else {
+            this.logger.error(withdrawRequestFromPartner.result);
+            await this.financeService.changeStateOnTransaction({
+              state: ResultStateEnum.FAILURE,
+              id: newTransaction.result._id.toHexString(),
+            });
+            const result = {
+              etat: true,
+              data: {
+                service: typeService,
+                recipient_phone_number: newTransaction.result.numero,
+                amount_send_net: amount,
+                amount_receive_in_balance: 0,
+                typeTransaction: TypeTransaction.WITHDRAW,
+                state: ResultStateEnum.FAILURE,
+                partner_reference: newTransaction.result.reference,
+                transaction_reference: 'N/A',
+              },
+            };
+            return result;
+          }
+        } else {
+          // erreur d'enregistrement de l'operation au niveau du partenaire
+          // notifier à l'utilisateur que la transaction n'a pa pu être crée en lui retournant les raisons du partenaire
+          await this.financeService.deleteTransactionByItem({
+            _id: newTransaction.result._id,
+          });
+          return {
+            etat: false,
+            error: `Problème avec le service ${typeService.toLocaleUpperCase()}, veuillez nous excusez nous le rendrons disponible pour vous dans les plus brefs délais. 👨‍💻👩‍💻`,
+          };
+        }
+      }
+      return newTransaction;
+    } else {
+      return {
+        etat: false,
+        error: new Error(
+          'Votre solde est insufisant pour effectuer cette opération.',
+        ),
+      };
+    }
+  }
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.financeService.remove(+id);
+  }
+
+  @Get()
+  @UseGuards(UserGuard)
+  async getAllAccount(@Request() req) {
+    const { _id } = req.userEntity;
+    const financeAccounts = await this.financeService.getAllAccountByItem({
+      idUser: _id,
+    });
+    const allFinanceAccountInfo: DataInfoInterfaceFinanceAccount[] = [];
+    for (const financeAccount of financeAccounts.result) {
+      const allTransactionForAccount =
+        await this.financeService.getAllTransactionByItem({
+          financeAccountId: financeAccount._id,
+        });
+      const transactions: DataInfoInterfaceTransaction[] =
+        allTransactionForAccount.result.map((transaction) => ({
+          numero: transaction.numero,
+          reference: transaction.reference,
+          montant_send_net: transaction.montant_send_net,
+          montant_give_of_client: transaction.montant_give_of_client,
+          service: transaction.service,
+          typeTransaction: transaction.typeTransaction,
+          state: transaction.state,
+          ref_partner: transaction.ref_partner,
+          created_at: transaction.created_at,
+          updated_at: transaction.updated_at,
+        }));
+      const financeAccountInfo: DataInfoInterfaceFinanceAccount = {
+        appName: financeAccount.appName,
+        percentage: financeAccount.percentage,
+        balance: financeAccount.balance,
+        urlCallback: financeAccount.urlCallback,
+        clientId: financeAccount.clientId,
+        clientSecret: financeAccount.clientSecret,
+        transactions,
+      };
+      allFinanceAccountInfo.push(financeAccountInfo);
+    }
+    return { etat: true, result: allFinanceAccountInfo };
   }
 }

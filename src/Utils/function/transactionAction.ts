@@ -1,11 +1,11 @@
 import {
-  TypePayementMarchandForAggregateur,
-  TypePayementMarchandOutForAggregateur,
+  TypePayementMarchandCashOutForAggregateur,
+  TypePayementMarchandCashInForAggregateur,
   TypePayementMobileMoney,
 } from 'src/Enum/FinanceEnum';
 import { ReponseServiceGeneral } from 'src/Interfaces/ResponseInterface';
 import {
-  DataInfoPaiementMarchand,
+  DataInfoInterfacePaiementMarchandForCentralApi,
   DataInterfaceCashInForTouchPay,
   DataInterfaceCashOutForTouchPay,
 } from 'src/Interfaces/TransactionInterface';
@@ -17,35 +17,35 @@ export const attributServiceTouchCodeByMethodPaiement = (item: {
   typePaiement: TypePayementMobileMoney;
   cashIn: boolean;
 }):
-  | TypePayementMarchandForAggregateur
-  | TypePayementMarchandOutForAggregateur
+  | TypePayementMarchandCashOutForAggregateur
+  | TypePayementMarchandCashInForAggregateur
   | TypePayementMobileMoney => {
   switch (item.typePaiement) {
     case TypePayementMobileMoney.ORANGE:
-      return item.cashIn
-        ? TypePayementMarchandForAggregateur.ORANGE
-        : TypePayementMarchandOutForAggregateur.ORANGE;
+      return !item.cashIn
+        ? TypePayementMarchandCashOutForAggregateur.ORANGE
+        : TypePayementMarchandCashInForAggregateur.ORANGE;
     case TypePayementMobileMoney.MTN:
-      return item.cashIn
-        ? TypePayementMarchandForAggregateur.MTN
-        : TypePayementMarchandOutForAggregateur.MTN;
+      return !item.cashIn
+        ? TypePayementMarchandCashOutForAggregateur.MTN
+        : TypePayementMarchandCashInForAggregateur.MTN;
     case TypePayementMobileMoney.Moov:
-      return item.cashIn
-        ? TypePayementMarchandForAggregateur.Moov
-        : TypePayementMarchandOutForAggregateur.Moov;
+      return !item.cashIn
+        ? TypePayementMarchandCashOutForAggregateur.Moov
+        : TypePayementMarchandCashInForAggregateur.Moov;
     default:
       return item.typePaiement;
   }
 };
 
-export async function cashInPaiementMarchand(
-  data: DataInterfaceCashInForTouchPay,
+export async function cashOutPaiementMarchand(
+  data: DataInterfaceCashOutForTouchPay,
 ): Promise<ReponseServiceGeneral> {
   const httpclient = new HttpClient();
 
   return new Promise(async (next) => {
     await httpclient
-      .request(process.env.ENDPOINT_PAIEMENT, {
+      .request(process.env.ENDPOINT_PAIEMENT_CASHOUT, {
         headers: { 'Content-Type': 'application/json', Accept: '*/*' },
         method: 'PUT',
         digestAuth: `${process.env.INTOUCH_USERNAME.trim()}:${process.env.INTOUCH_PASSWORD.trim()}`,
@@ -67,12 +67,12 @@ export async function cashInPaiementMarchand(
   });
 }
 
-export async function cashOutPaiementMarchand(
-  data: DataInterfaceCashOutForTouchPay,
+export async function cashInPaiementMarchand(
+  data: DataInterfaceCashInForTouchPay,
 ): Promise<ReponseServiceGeneral> {
   const AxiosInstance = axios.create();
   return new Promise(async (next) => {
-    AxiosInstance.post(process.env.ENDPOINT_CASHOUT, data, {
+    AxiosInstance.post(process.env.ENDPOINT_PAIEMENT_CASHIN, data, {
       headers: { 'Content-Type': 'application/json', Accept: '*/*' },
       auth: {
         username: process.env.INTOUCH_USERNAME,
@@ -93,7 +93,7 @@ export async function cashOutPaiementMarchand(
 }
 
 export async function retrunInfoPaiementMarchand(body: {
-  data: { etat: boolean; data: DataInfoPaiementMarchand };
+  data: { etat: boolean; data: DataInfoInterfacePaiementMarchandForCentralApi };
   urlCallback: string;
 }): Promise<ReponseServiceGeneral> {
   const AxiosInstance = axios.create();
@@ -111,13 +111,16 @@ export async function retrunInfoPaiementMarchand(body: {
   });
 }
 
-export const amountGiveAtClient = ({
+export const amountGiveAtClientForDeposit = ({
   percentage,
   amount,
 }: {
   percentage: number;
   amount: number;
 }) => (1 - percentage) * amount;
+
+export const amountGiveAtClientForWithdraw = ({ amount }: { amount: number }) =>
+  amount - parseInt(process.env.INTOUCH_FEES_CASHIN.toString(), 10);
 
 export const amountAddToReserve = ({
   percentage,
@@ -126,5 +129,5 @@ export const amountAddToReserve = ({
   percentage: number;
   amount: number;
 }) =>
-  (percentage - parseFloat(process.env.INTOUCH_FEES_CASHIN.toString())) *
+  (percentage - parseFloat(process.env.INTOUCH_FEES_CASHOUT.toString())) *
   amount;

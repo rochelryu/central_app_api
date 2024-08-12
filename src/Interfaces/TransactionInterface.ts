@@ -1,13 +1,13 @@
 import {
   ResultStateEnum,
-  TypePayementMarchandForAggregateur,
-  TypePayementMarchandOutForAggregateur,
+  TypePayementMarchandCashOutForAggregateur,
+  TypePayementMarchandCashInForAggregateur,
   TypePayementMobileMoney,
   TypeTransaction,
 } from 'src/Enum/FinanceEnum';
 
-export interface DataInterfaceCashInForTouchPay {
-  serviceCode: TypePayementMarchandForAggregateur;
+export interface DataInterfaceCashOutForTouchPay {
+  serviceCode: TypePayementMarchandCashOutForAggregateur;
   idFromClient: string;
   amount: number;
   callback: string;
@@ -21,8 +21,8 @@ export interface DataInterfaceCashInForTouchPay {
   };
 }
 
-export interface DataInterfaceCashOutForTouchPay {
-  service_id: TypePayementMarchandOutForAggregateur;
+export interface DataInterfaceCashInForTouchPay {
+  service_id: TypePayementMarchandCashInForAggregateur;
   recipient_phone_number: string;
   amount: number;
   call_back_url: string;
@@ -32,7 +32,7 @@ export interface DataInterfaceCashOutForTouchPay {
   password_api: string;
 }
 
-export interface DataInfoPaiementMarchand {
+export interface DataInfoInterfacePaiementMarchandForCentralApi {
   service: TypePayementMobileMoney;
   recipient_phone_number: string;
   amount_send_net: number;
@@ -41,4 +41,28 @@ export interface DataInfoPaiementMarchand {
   state: ResultStateEnum;
   partner_reference: string;
   transaction_reference: string;
+}
+
+export interface DataInfoInterfaceFinanceAccount {
+  appName: string;
+  percentage: number;
+  balance: number;
+  urlCallback: string;
+  clientId: string;
+  clientSecret: string;
+  transactions: DataInfoInterfaceTransaction[];
+}
+
+export interface DataInfoInterfaceTransaction {
+  financeAccountId: string;
+  montant_give_of_client: number;
+  montant_send_net: number;
+  typeTransaction: TypeTransaction;
+  state: ResultStateEnum;
+  service: TypePayementMobileMoney;
+  numero: string;
+  ref_partner: string;
+  reference: string;
+  created_at: Date;
+  updated_at: Date;
 }

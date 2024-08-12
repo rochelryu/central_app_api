@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateFinanceDto } from './dto/create-finance.dto';
-import { UpdateFinanceDto } from './dto/update-finance.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { FinanceAccount } from 'src/finance/entities/finance.entity';
-import { hash } from 'bcrypt';
+// import { hash } from 'bcrypt';
 import { ReponseServiceGeneral } from 'src/Interfaces/ResponseInterface';
 import { generateRecovery } from 'src/Utils/function/recoveryAction';
 import { randomBytes } from 'crypto';
@@ -73,6 +71,22 @@ export class FinanceService {
     });
   }
 
+  getAllAccountByItem(item): Promise<ReponseServiceGeneral> {
+    return new Promise(async (next) => {
+      await this.financeAccountModel
+        .find(item)
+        .then((result) => {
+          next({
+            etat: true,
+            result,
+          });
+        })
+        .catch((error) => {
+          next({ etat: false, error });
+        });
+    });
+  }
+
   createTransaction(createTransaction: {
     reference: string;
     montant_send_net: number;
@@ -84,12 +98,52 @@ export class FinanceService {
     state: ResultStateEnum;
   }): Promise<ReponseServiceGeneral> {
     return new Promise(async (next) => {
-      const transaction = new this.transactionModel({
-        ...createTransaction,
-        recovery: generateRecovery(),
-      });
-      await transaction
-        .save()
+      await this.transactionModel
+        .findOne({
+          $and: [
+            { numero: createTransaction.numero },
+            { financeAccountId: createTransaction.financeAccountId },
+            { typeTransaction: createTransaction.typeTransaction },
+            {
+              $or: [{ state: ResultStateEnum.PENDING }],
+            },
+          ],
+        })
+        .then(async (res) => {
+          if (!res) {
+            const transaction = new this.transactionModel({
+              ...createTransaction,
+              recovery: generateRecovery(),
+            });
+            await transaction
+              .save()
+              .then((result) => {
+                next({
+                  etat: true,
+                  result,
+                });
+              })
+              .catch((error) => {
+                next({ etat: false, error });
+              });
+          } else {
+            next({
+              etat: false,
+              error: new Error(
+                "Une transaction vers se numero est déjà en cours veuillez patienter qu'on l'à finalise",
+              ),
+            });
+          }
+        })
+        .catch((error) => next({ etat: false, error }));
+    });
+  }
+
+  getAllTransactionByItem(item): Promise<ReponseServiceGeneral> {
+    return new Promise(async (next) => {
+      await this.transactionModel
+        .find(item)
+        .sort({ _id: -1 })
         .then((result) => {
           next({
             etat: true,
@@ -116,7 +170,7 @@ export class FinanceService {
           _id: item.id,
           $or: [
             { state: ResultStateEnum.INITIALISE },
-            { state: ResultStateEnum.IN_WAIT },
+            { state: ResultStateEnum.PENDING },
           ],
         })
         .then(async (result) => {
@@ -175,9 +229,10 @@ export class FinanceService {
     });
   }
 
-  async depositInFinanceAccount(item: {
+  async manageBalanceOfFinanceAccount(item: {
     amount: number;
     _id: SchemaNatif.Types.ObjectId;
+    cashOut: boolean;
   }): Promise<ReponseServiceGeneral> {
     return new Promise(async (next) => {
       await this.financeAccountModel
@@ -186,7 +241,7 @@ export class FinanceService {
         })
         .then(async (result) => {
           if (result) {
-            result.balance += item.amount;
+            result.balance += item.cashOut ? item.amount : -item.amount;
             await result
               .save()
               .then((res) => {
@@ -235,10 +290,6 @@ export class FinanceService {
           next({ etat: false, error });
         });
     });
-  }
-
-  update(id: number, updateFinanceDto: UpdateFinanceDto) {
-    return `This action updates a #${id} finance`;
   }
 
   remove(id: number) {
